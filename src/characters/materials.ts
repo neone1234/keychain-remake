@@ -243,11 +243,11 @@ export function addFuzz(body: THREE.Mesh, o: SoftOptions, fuzz: FuzzOptions = {}
   const m = new THREE.MeshPhysicalMaterial({
     color,
     roughness: 1,
-    sheen: 0.9,
+    sheen: 0.6,
     sheenRoughness: 0.5,
     sheenColor: new THREE.Color(o.sheenColor ?? color.clone().lerp(new THREE.Color(1, 1, 1), 0.45)),
   });
-  const patch = softPatch({ ...o, rim: (o.rim ?? 0.3) * 1.4, wrap: Math.min(1, (o.wrap ?? 0.5) + 0.15) }, color, null);
+  const patch = softPatch({ ...o, rim: (o.rim ?? 0.3) * 1.15, wrap: Math.min(1, (o.wrap ?? 0.5) + 0.1) }, color, null);
   const clear = fuzz.clear ?? [];
   patch.uniforms.uFuzzLength = { value: fuzz.length ?? 0.016 };
   patch.uniforms.uFuzzDensity = { value: fuzz.density ?? 95 };

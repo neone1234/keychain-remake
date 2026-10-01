@@ -40,13 +40,13 @@ const PALETTES: Record<LightName, Palette> = {
   },
   day: {
     top: '#5187b6', mid: '#7cb1d1', horizon: '#d1e7ef', cloudLit: '#ffffff', cloudShade: '#d4deee', haze: '#f8fbff', ink: '#1f2638',
-    bridge: '#c54d36', skyline: '#808ea4', key: '#fff3e4', fill: '#bfd7ff', rim: '#c8d9ff',
-    exposure: 1.04, studio: 1, stars: 0, lights: 0, keyI: 2.4, fillI: 0.75, rimI: 1.3,
+    bridge: '#c9472c', skyline: '#808ea4', key: '#fff3e4', fill: '#bfd7ff', rim: '#c8d9ff',
+    exposure: 1.0, studio: 1, stars: 0, lights: 0, keyI: 1.85, fillI: 0.6, rimI: 1.1,
   },
   golden: {
     top: '#5a80ab', mid: '#d5b096', horizon: '#f5c58f', cloudLit: '#fff0dc', cloudShade: '#c7b0c1', haze: '#f7e5d6', ink: '#1f2638',
     bridge: '#d6623d', skyline: '#908597', key: '#ffd3a3', fill: '#c3bad7', rim: '#ffc8b4',
-    exposure: 1.0, studio: 0.92, stars: 0, lights: 0.1, keyI: 2.2, fillI: 0.62, rimI: 1.4,
+    exposure: 1.0, studio: 0.92, stars: 0, lights: 0.1, keyI: 1.9, fillI: 0.55, rimI: 1.3,
   },
   dusk: {
     top: '#2b3664', mid: '#7f5e8b', horizon: '#e49072', cloudLit: '#f2baa8', cloudShade: '#6c5883', haze: '#c9a4aa', ink: '#f0e7f0',

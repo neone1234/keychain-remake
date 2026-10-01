@@ -260,12 +260,12 @@ function layout() {
   } else {
     let lh = 0.88;
     let lw = (lh * letterAspect) / view.aspect;
-    const maxText = 0.33;
+    const maxText = 0.3;
     if ((LETTER_TEXT.right - LETTER_TEXT.left) * lw > maxText) {
       lw = maxText / (LETTER_TEXT.right - LETTER_TEXT.left);
       lh = (lw * view.aspect) / letterAspect;
     }
-    const textLeft = Math.max(0.045, 0.335 - (LETTER_TEXT.right - LETTER_TEXT.left) * lw);
+    const textLeft = Math.max(0.04, 0.315 - (LETTER_TEXT.right - LETTER_TEXT.left) * lw);
     L.set(textLeft - (LETTER_TEXT.left - 0.5) * lw, 0.5, lw, lh);
     backdrop.uniforms.uFrost.value = 1;
   }
@@ -317,7 +317,7 @@ function showSky(f: SkyFrame, now: number, dt: number) {
   key.intensity = f.keyI;
   fill.color.copy(f.fill);
   fill.groundColor.copy(f.haze).multiplyScalar(0.75);
-  fill.intensity = f.fillI * 1.25 + 0.15;
+  fill.intensity = f.fillI + 0.12;
   rim.color.copy(f.rim);
   rim.intensity = f.rimI;
   softLight.uRimLight.value.copy(f.fill).multiplyScalar(0.55 + 0.45 * f.fillI).lerp(f.key, 0.25);

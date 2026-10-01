@@ -128,7 +128,7 @@ export function createBackdrop({ sky, clouds, letter }: BackdropInputs) {
           float near = smoothstep(0.55, 0.95, m.r);
           float hill = 1.0 - smoothstep(0.2, 0.35, m.r);
           vec3 structure = mix(uSkyline * (1.0 - 0.2 * m.b), uBridgeColor * (1.0 - 0.36 * m.b), near);
-          float fade = mix(0.55, 0.2, near);
+          float fade = mix(0.55, 0.11, near);
           fade = mix(fade, 0.78, hill);
           fade = mix(fade, 0.93, uFog * (1.0 - 0.25 * near));
           fade = mix(fade, 0.7, uRain * 0.6);

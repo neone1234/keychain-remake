@@ -103,8 +103,8 @@ export function createShroom(): Character {
   const cheekR = surfaceAt(stem, 0.165, -0.285);
   const mouthAt = surfaceAt(stem, 0, -0.27);
   const creamFelt: SoftOptions = {
-    color: '#f6e9d4',
-    sheenColor: '#fff4e4',
+    color: '#ecdcc3',
+    sheenColor: '#f7ead6',
     scatter: '#e9a98c',
     rimColor: '#fff6ea',
     spots: [

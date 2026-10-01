@@ -39,12 +39,12 @@ export function createNimbus(): Character {
   const cheekR = surfaceAt(body, 0.245, -0.06);
   const mouthAt = surfaceAt(body, 0, -0.055);
   const plush: SoftOptions = {
-    color: '#f8f6f1',
-    sheenColor: '#ffffff',
-    scatter: '#ffcdbd',
+    color: '#e9e6e0',
+    sheenColor: '#f4f2ee',
+    scatter: '#f2b9a6',
     rimColor: '#ffffff',
-    rim: 0.42,
-    wrap: 0.7,
+    rim: 0.26,
+    wrap: 0.62,
     detailStrength: 0.5,
     spots: [
       { at: cheekL.point, radius: 0.085, color: '#ff9b96', amount: 0.7, soft: 0.85 },
