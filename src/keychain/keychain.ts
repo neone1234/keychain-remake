@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { integrate, point, solve, type Link, type PPoint } from './physics';
 import { chromeMaterial, EGG } from './stone';
+import { layerCode, type LayerUniform } from './layers';
 import { clamp, damp, smoothstep } from '../util/math';
 import type { Character, CharacterFrame } from '../characters/types';
 
@@ -20,6 +21,8 @@ export interface CharmSetup {
   /** stones let clicks on their clear rim through to what is behind */
   glass?: THREE.Mesh;
   character?: Character;
+  /** depth-layer code written by this charm's materials (see layers.ts) */
+  layer?: LayerUniform;
 }
 
 interface Charm extends CharmSetup {
@@ -215,7 +218,7 @@ export class Keychain {
 
   private contact(a: Charm, b: Charm) {
     const level = 1 - smoothstep(0.1, 0.3, Math.abs(a.z - b.z));
-    return { reach: (a.radius + b.radius) * 0.5 * (0.9 + 0.2 * level), level };
+    return { reach: (a.radius + b.radius) * 0.5 * (1.04 + 0.34 * level), level };
   }
 
   private breeze(t: number) {
@@ -423,6 +426,7 @@ export class Keychain {
   private sync(dt: number, now: number) {
     for (const c of this.charms) {
       c.z = damp(c.z, c.zPlace, 7, dt);
+      if (c.layer) c.layer.value = layerCode(c.z);
       const vx = (c.center.x - c.center.px) / STEP;
       const vy = (c.center.y - c.center.py) / STEP;
       if (dt > 0) {

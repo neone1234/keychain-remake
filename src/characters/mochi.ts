@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Character } from './types';
-import { felt } from './materials';
+import { addFuzz, felt, type SoftOptions } from './materials';
 import { Blinker, catMouth, Eye, blob, faceAlong, surfaceAt, taperedTube } from './parts';
 import { clamp, damp } from '../util/math';
 
@@ -27,13 +27,25 @@ export function createMochi(): Character {
   const cheekR = surfaceAt(body, 0.275, -0.035);
   const mouthAt = surfaceAt(body, 0, -0.012);
 
-  body.material = felt('#f7b1a5', {
-    sheenColor: '#ffe7e0',
+  const skin: SoftOptions = {
+    color: '#f7aea1',
+    sheenColor: '#ffd3ca',
     scatter: '#ff6a62',
     rimColor: '#ffd9d2',
     spots: [
       { at: cheekL.point, radius: 0.088, color: '#ff8579', amount: 0.62, soft: 0.85 },
       { at: cheekR.point, radius: 0.088, color: '#ff8579', amount: 0.62, soft: 0.85 },
+    ],
+    occluders: [{ at: new THREE.Vector3(0, -0.62, 0), radius: 0.5, strength: 0.45 }],
+  };
+  body.material = felt(skin.color, skin);
+  addFuzz(body, skin, {
+    length: 0.016,
+    density: 95,
+    clear: [
+      { at: eyeL.point, radius: 0.07 },
+      { at: eyeR.point, radius: 0.07 },
+      { at: mouthAt.point.clone().add(new THREE.Vector3(0, -0.01, 0)), radius: 0.06 },
     ],
   });
 

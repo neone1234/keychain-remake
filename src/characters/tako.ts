@@ -35,6 +35,7 @@ export function createTako(): Character {
   const skin = vinyl('#ff6b58', {
     scatter: '#e2281f',
     rimColor: '#ffc4b8',
+    occluders: [{ at: new THREE.Vector3(0, -0.36, 0), radius: 0.3, strength: 0.55 }],
     spots: [
       { at: cheekL.point, radius: 0.07, color: '#ff9c93', amount: 0.55, soft: 0.85 },
       { at: cheekR.point, radius: 0.07, color: '#ff9c93', amount: 0.55, soft: 0.85 },
@@ -51,7 +52,7 @@ export function createTako(): Character {
   mouth.scale.set(1, 1.15, 1);
   head.add(mouth);
 
-  const armMat = vinyl('#ff6b58', { scatter: '#e2281f', rimColor: '#ffc4b8' });
+  const armMat = vinyl('#ff6b58', { scatter: '#e2281f', rimColor: '#ffc4b8', occluders: [{ at: new THREE.Vector3(0, 0.02, 0), radius: 0.3, strength: 0.6 }] });
   const arms: { pivot: THREE.Group; axis: THREE.Vector3; phase: number }[] = [];
   for (let i = 0; i < ARMS; i++) {
     const a = Math.PI / 2 + ((i - 3) * Math.PI * 2) / ARMS;

@@ -5,7 +5,7 @@ import type { SkyUniforms } from './clouds';
 /** the drifting haze and close rain in front of the keychain (screen-space, drawn last) */
 export function createNearLayers(sky: SkyUniforms, haze: THREE.Texture) {
   const material = new THREE.ShaderMaterial({
-    uniforms: { ...sky, uHazeTex: { value: haze }, uHazeAmount: { value: 0.85 } },
+    uniforms: { ...sky, uHazeTex: { value: haze }, uHazeAmount: { value: 0.72 } },
     transparent: true,
     premultipliedAlpha: true,
     blending: THREE.CustomBlending,

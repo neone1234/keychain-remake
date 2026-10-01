@@ -106,7 +106,7 @@ export class CloudLayers {
           vec2 p = vec2(vUv.x * uAspect, vUv.y);
           float n = fbm3(p * 1.15 + vec2(uTime * 0.028, uTime * 0.004));
           float low = 1.0 - smoothstep(0.0, 0.33 + 0.12 * uFog, vUv.y);
-          float corners = 0.55 * smoothstep(0.7, 1.0, vUv.y) * (1.0 - smoothstep(0.0, 0.3, min(vUv.x, 1.0 - vUv.x)));
+          float corners = 0.3 * smoothstep(0.74, 1.0, vUv.y) * (1.0 - smoothstep(0.0, 0.24, min(vUv.x, 1.0 - vUv.x)));
           float a = clamp(smoothstep(0.3, 0.76, n) * (low + corners) * (0.7 + 0.22 * uFog) + uFog * 0.12 + uRain * 0.05, 0.0, 1.0);
           gl_FragColor = vec4(uHaze * a, a);
         }`),

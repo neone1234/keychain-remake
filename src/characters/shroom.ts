@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Character } from './types';
-import { felt } from './materials';
+import { addFuzz, felt, type SoftOptions } from './materials';
 import { Blinker, Eye, faceAlong, smile, surfaceAt } from './parts';
 import { clamp, damp, rng } from '../util/math';
 
@@ -21,29 +21,38 @@ export function createShroom(): Character {
   const cap = new THREE.Group();
   cap.position.y = -0.02;
   lift.add(cap);
+  const capFelt: SoftOptions = { color: '#e4463b', sheenColor: '#ff8f80', scatter: '#a8161b', rimColor: '#ffb0a2', rim: 0.24 };
   const capTop = new THREE.Mesh(
     lathe([
-      [0.0008, 0.35],
-      [0.13, 0.34],
-      [0.25, 0.3],
-      [0.35, 0.225],
-      [0.43, 0.13],
-      [0.475, 0.04],
-      [0.485, -0.012],
       [0.47, -0.048],
+      [0.485, -0.012],
+      [0.475, 0.04],
+      [0.43, 0.13],
+      [0.35, 0.225],
+      [0.25, 0.3],
+      [0.13, 0.34],
+      [0.0008, 0.35],
     ]),
-    felt('#e4463b', { sheenColor: '#ffb3a6', scatter: '#a8161b', rimColor: '#ffb0a2', rim: 0.24 }),
+    felt(capFelt.color, capFelt),
   );
   cap.add(capTop);
+  addFuzz(capTop, capFelt, { length: 0.014, density: 100 });
+  const gills: SoftOptions = {
+    color: '#f0d9bd',
+    sheenColor: '#fff3e2',
+    scatter: '#d79a72',
+    detailScale: 3,
+    occluders: [{ at: new THREE.Vector3(0, -0.3, 0), radius: 0.3, strength: 0.75 }],
+  };
   const under = new THREE.Mesh(
     lathe([
-      [0.47, -0.048],
-      [0.43, -0.068],
-      [0.33, -0.07],
-      [0.2, -0.058],
       [0.0008, -0.05],
+      [0.2, -0.058],
+      [0.33, -0.07],
+      [0.43, -0.068],
+      [0.47, -0.048],
     ]),
-    felt('#f0d9bd', { sheenColor: '#fff3e2', scatter: '#d79a72', detailScale: 3 }),
+    felt(gills.color, gills),
   );
   cap.add(under);
 
@@ -93,16 +102,28 @@ export function createShroom(): Character {
   const cheekL = surfaceAt(stem, -0.165, -0.285);
   const cheekR = surfaceAt(stem, 0.165, -0.285);
   const mouthAt = surfaceAt(stem, 0, -0.27);
-  const cream = felt('#f6e9d4', {
-    sheenColor: '#fffaf0',
+  const creamFelt: SoftOptions = {
+    color: '#f6e9d4',
+    sheenColor: '#fff4e4',
     scatter: '#e9a98c',
     rimColor: '#fff6ea',
     spots: [
       { at: cheekL.point, radius: 0.058, color: '#ff9f93', amount: 0.6, soft: 0.85 },
       { at: cheekR.point, radius: 0.058, color: '#ff9f93', amount: 0.6, soft: 0.85 },
     ],
-  });
+    occluders: [{ at: new THREE.Vector3(0, 0.1, 0), radius: 0.43, strength: 0.7 }],
+  };
+  const cream = felt(creamFelt.color, creamFelt);
   stem.material = cream;
+  addFuzz(stem, creamFelt, {
+    length: 0.013,
+    density: 105,
+    clear: [
+      { at: eyeL.point, radius: 0.058 },
+      { at: eyeR.point, radius: 0.058 },
+      { at: mouthAt.point, radius: 0.045 },
+    ],
+  });
   const eyes = [new Eye(0.031, 0.044, 0.026).place(eyeL.point, eyeL.normal), new Eye(0.031, 0.044, 0.026).place(eyeR.point, eyeR.normal)];
   for (const e of eyes) stem.add(e.group);
   const mouth = smile(0.046, 0.015, 0.0068);

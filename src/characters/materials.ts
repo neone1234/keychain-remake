@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { clayMap, fibreMap } from './textures';
+import { markShared } from '../keychain/layers';
 
 /** scene-wide light the soft materials use for their fuzzy rim (set from the sky every frame) */
 export const softLight = { uRimLight: { value: new THREE.Color(1, 1, 1) } };
@@ -13,8 +14,16 @@ export interface Spot {
   soft?: number;
 }
 
+/** a sphere that darkens what faces it (cheap analytic ambient occlusion for crevices) */
+export interface Occluder {
+  at: THREE.Vector3;
+  radius: number;
+  strength?: number;
+}
+
 export interface SoftOptions {
   color: THREE.ColorRepresentation;
+  occluders?: Occluder[];
   roughness?: number;
   sheen?: number;
   sheenRoughness?: number;
@@ -76,6 +85,9 @@ export interface SoftPatch {
   defines: Record<string, string | number>;
 }
 
+/** writes a loop out in full (some GPU compilers warn about loops that run once) */
+const unroll = (n: number, body: (i: number) => string) => Array.from({ length: n }, (_, i) => body(i)).join('\n');
+
 /** shared shader surgery for felt, plush, fur and vinyl: wrap lighting, scatter tint, fuzz rim, detail normals, painted spots */
 export function patchSoft(shader: THREE.WebGLProgramParametersWithUniforms, patch: SoftPatch, extra?: { vertexHead?: string; vertexBody?: string; fragmentHead?: string; fragmentStart?: string; afterColor?: string }) {
   Object.assign(shader.uniforms, patch.uniforms, softLight);
@@ -105,6 +117,10 @@ export function patchSoft(shader: THREE.WebGLProgramParametersWithUniforms, patc
         uniform vec4 uSpotCol[SPOTS];
         uniform float uSpotSoft[SPOTS];
       #endif
+      #if OCCLUDERS > 0
+        uniform vec4 uOccPos[OCCLUDERS];
+        uniform float uOccStrength[OCCLUDERS];
+      #endif
       ${extra?.fragmentHead ?? ''}`,
     )
     .replace('#include <lights_physical_pars_fragment>', wrapChunk())
@@ -112,14 +128,33 @@ export function patchSoft(shader: THREE.WebGLProgramParametersWithUniforms, patc
     .replace(
       '#include <color_fragment>',
       /* glsl */ `#include <color_fragment>
-      #if SPOTS > 0
-        for (int i = 0; i < SPOTS; i++) {
-          float d = distance(vObjPos, uSpotPos[i].xyz);
-          float k = 1.0 - smoothstep(uSpotPos[i].w * (1.0 - uSpotSoft[i]), uSpotPos[i].w, d);
-          diffuseColor.rgb = mix(diffuseColor.rgb, uSpotCol[i].rgb, k * uSpotCol[i].a);
+      ${unroll(
+        Number(patch.defines.SPOTS),
+        (i) => `{
+          float d = distance(vObjPos, uSpotPos[${i}].xyz);
+          float k = 1.0 - smoothstep(uSpotPos[${i}].w * (1.0 - uSpotSoft[${i}]), uSpotPos[${i}].w, d);
+          diffuseColor.rgb = mix(diffuseColor.rgb, uSpotCol[${i}].rgb, k * uSpotCol[${i}].a);
+        }`,
+      )}
+      ${extra?.afterColor ?? ''}
+      #if OCCLUDERS > 0
+        {
+          vec3 on = normalize(vObjNormal);
+          float ao = 1.0;
+          ${unroll(
+            Number(patch.defines.OCCLUDERS),
+            (i) => `{
+            vec3 d = uOccPos[${i}].xyz - vObjPos;
+            float dist = max(length(d), 1e-3);
+            float r = uOccPos[${i}].w;
+            ao *= 1.0 - uOccStrength[${i}] * clamp(dot(on, d / dist), 0.0, 1.0) * clamp((r * r) / (dist * dist), 0.0, 1.0);
+          }`,
+          )}
+          ao = clamp(ao, 0.0, 1.0);
+          float l = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+          diffuseColor.rgb = mix(vec3(l), diffuseColor.rgb, 1.0 + 0.35 * (1.0 - ao)) * mix(0.42, 1.0, ao);
         }
-      #endif
-      ${extra?.afterColor ?? ''}`,
+      #endif`,
     )
     .replace(
       '#include <normal_fragment_maps>',
@@ -153,15 +188,24 @@ export function softMaterial(o: SoftOptions): THREE.MeshPhysicalMaterial {
     metalness: 0,
     sheen: o.sheen ?? 0,
     sheenRoughness: o.sheenRoughness ?? 0.5,
-    sheenColor: new THREE.Color(o.sheenColor ?? color.clone().lerp(new THREE.Color(1, 1, 1), 0.6)),
+    sheenColor: new THREE.Color(o.sheenColor ?? color.clone().lerp(new THREE.Color(1, 1, 1), 0.35)),
     clearcoat: o.clearcoat ?? 0,
     clearcoatRoughness: o.clearcoatRoughness ?? 0.3,
     emissive: new THREE.Color(o.emissive ?? 0x000000),
     emissiveIntensity: o.emissiveIntensity ?? 1,
   });
-  const spots = o.spots ?? [];
   const detail = o.detail === undefined ? null : o.detail;
-  const patch: SoftPatch = {
+  const patch = softPatch(o, color, detail);
+  m.onBeforeCompile = (shader) => patchSoft(shader, patch);
+  m.customProgramCacheKey = () => `soft-${patch.defines.SPOTS}-${patch.defines.OCCLUDERS}-${detail ?? 'none'}`;
+  m.userData.patch = patch;
+  return m;
+}
+
+function softPatch(o: Partial<SoftOptions>, color: THREE.Color, detail: 'fibre' | 'clay' | null): SoftPatch {
+  const spots = o.spots ?? [];
+  const occ = o.occluders ?? [];
+  return {
     uniforms: {
       uWrap: { value: o.wrap ?? 0.4 },
       uScatter: { value: new THREE.Color(o.scatter ?? color.clone().multiplyScalar(0.8)) },
@@ -174,21 +218,85 @@ export function softMaterial(o: SoftOptions): THREE.MeshPhysicalMaterial {
       uSpotPos: { value: spots.map((s) => new THREE.Vector4(s.at.x, s.at.y, s.at.z, s.radius)) },
       uSpotCol: { value: spots.map((s) => { const c = new THREE.Color(s.color); return new THREE.Vector4(c.r, c.g, c.b, s.amount ?? 1); }) },
       uSpotSoft: { value: spots.map((s) => s.soft ?? 0.5) },
+      uOccPos: { value: occ.map((s) => new THREE.Vector4(s.at.x, s.at.y, s.at.z, s.radius)) },
+      uOccStrength: { value: occ.map((s) => s.strength ?? 0.6) },
     },
-    defines: { SPOTS: spots.length, ...(detail ? { USE_DETAIL: 1 } : {}) },
+    defines: { SPOTS: spots.length, OCCLUDERS: occ.length, ...(detail ? { USE_DETAIL: 1 } : {}) },
   };
-  m.onBeforeCompile = (shader) => patchSoft(shader, patch);
-  m.customProgramCacheKey = () => `soft-${spots.length}-${detail ?? 'none'}`;
-  m.userData.patch = patch;
-  return m;
+}
+
+export interface FuzzOptions {
+  length?: number;
+  shells?: number;
+  density?: number;
+  /** places (in the body's space) kept bare, so eyes and stitched mouths stay crisp */
+  clear?: { at: THREE.Vector3; radius: number }[];
+}
+
+/**
+ * Peach fuzz for felt and plush: a few short shells over a body, cut into fine fibres with a 3D hash so it works
+ * on any shape. Opaque (discard), so the glass sees it. Copies the body's colour, spots and occluders.
+ */
+export function addFuzz(body: THREE.Mesh, o: SoftOptions, fuzz: FuzzOptions = {}) {
+  const shells = fuzz.shells ?? 5;
+  const color = new THREE.Color(o.color);
+  const m = new THREE.MeshPhysicalMaterial({
+    color,
+    roughness: 1,
+    sheen: 0.9,
+    sheenRoughness: 0.5,
+    sheenColor: new THREE.Color(o.sheenColor ?? color.clone().lerp(new THREE.Color(1, 1, 1), 0.45)),
+  });
+  const patch = softPatch({ ...o, rim: (o.rim ?? 0.3) * 1.4, wrap: Math.min(1, (o.wrap ?? 0.5) + 0.15) }, color, null);
+  const clear = fuzz.clear ?? [];
+  patch.uniforms.uFuzzLength = { value: fuzz.length ?? 0.016 };
+  patch.uniforms.uFuzzDensity = { value: fuzz.density ?? 95 };
+  patch.uniforms.uClear = { value: clear.map((c) => new THREE.Vector4(c.at.x, c.at.y, c.at.z, c.radius)) };
+  patch.defines.CLEAR = clear.length;
+  m.onBeforeCompile = (shader) =>
+    patchSoft(shader, patch, {
+      vertexHead: 'attribute float aShell;\nuniform float uFuzzLength;\nvarying float vShell;',
+      vertexBody: 'transformed += normalize(objectNormal) * (0.0015 + aShell * uFuzzLength);\nvShell = aShell;',
+      fragmentHead: /* glsl */ `
+        uniform float uFuzzDensity;
+        varying float vShell;
+        #if CLEAR > 0
+          uniform vec4 uClear[CLEAR];
+        #endif
+        float fuzzHash(vec3 p) {
+          p = fract(p * 0.3183099 + 0.1);
+          p *= 17.0;
+          return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+        }`,
+      fragmentStart: /* glsl */ `
+        {
+          vec3 q = vObjPos * uFuzzDensity;
+          float h = max(fuzzHash(floor(q)), fuzzHash(floor(q * 0.77 + 13.1)));
+          float keep = 0.38 + 0.56 * vShell;
+          ${unroll(clear.length, (i) => `keep += 1.0 - smoothstep(uClear[${i}].w * 0.75, uClear[${i}].w, distance(vObjPos, uClear[${i}].xyz));`)}
+          if (h < keep) discard;
+        }`,
+      afterColor: 'diffuseColor.rgb *= mix(0.86, 1.08, vShell);',
+    });
+  m.customProgramCacheKey = () => `fuzz-${patch.defines.SPOTS}-${patch.defines.OCCLUDERS}-${clear.length}`;
+  const geometry = body.geometry.clone();
+  const shell = new Float32Array(shells);
+  for (let i = 0; i < shells; i++) shell[i] = (i + 1) / shells;
+  geometry.setAttribute('aShell', new THREE.InstancedBufferAttribute(shell, 1));
+  const mesh = new THREE.InstancedMesh(geometry, m, shells);
+  const identity = new THREE.Matrix4();
+  for (let i = 0; i < shells; i++) mesh.setMatrixAt(i, identity);
+  mesh.frustumCulled = false;
+  body.add(mesh);
+  return mesh;
 }
 
 export const felt = (color: THREE.ColorRepresentation, o: Partial<SoftOptions> = {}) =>
   softMaterial({
     color,
     roughness: 0.96,
-    sheen: 1,
-    sheenRoughness: 0.42,
+    sheen: 0.7,
+    sheenRoughness: 0.45,
     detail: 'fibre',
     detailStrength: 0.42,
     detailScale: 2.4,
@@ -215,19 +323,20 @@ export const vinyl = (color: THREE.ColorRepresentation, o: Partial<SoftOptions> 
     ...o,
   });
 
-/** glossy wet-looking black for eyes */
+/** glossy black for eyes: dark body, small crisp highlights */
 export const eyeMaterial = new THREE.MeshPhysicalMaterial({
-  color: '#17141d',
-  roughness: 0.16,
+  color: '#0c0a10',
+  roughness: 0.1,
   metalness: 0,
-  clearcoat: 1,
-  clearcoatRoughness: 0.03,
-  specularIntensity: 1,
+  specularIntensity: 0.5,
+  envMapIntensity: 0.55,
 });
 
-export const sparkleMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2.4, 2.4) });
+export const sparkleMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.2, 2.2) });
 
-export const mouthMaterial = new THREE.MeshPhysicalMaterial({ color: '#3b2321', roughness: 0.55, clearcoat: 0.4, clearcoatRoughness: 0.3 });
+export const mouthMaterial = new THREE.MeshPhysicalMaterial({ color: '#33201f', roughness: 0.5, specularIntensity: 0.4, envMapIntensity: 0.5 });
+
+markShared(eyeMaterial, sparkleMaterial, mouthMaterial);
 
 export interface FurOptions {
   color: THREE.ColorRepresentation;
@@ -272,7 +381,7 @@ export function furMaterial(o: FurOptions) {
       uSpotCol: { value: [] },
       uSpotSoft: { value: [] },
     },
-    defines: { SPOTS: 0 },
+    defines: { SPOTS: 0, OCCLUDERS: 0 },
   };
   m.onBeforeCompile = (shader) =>
     patchSoft(shader, patch, {

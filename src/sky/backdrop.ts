@@ -155,11 +155,11 @@ export function createBackdrop({ sky, clouds, letter }: BackdropInputs) {
           }
         }
 
-        vec4 cl = textureLod(uClouds, uv, frost * 3.2);
-        col = col * (1.0 - cl.a) + cl.rgb;
+        vec4 cl = textureLod(uClouds, uv, frost * 2.4);
+        col = col * (1.0 - cl.a * (1.0 - 0.35 * frost)) + cl.rgb * (1.0 - 0.35 * frost);
 
         float inkLight = dot(uInk, vec3(0.3, 0.59, 0.11));
-        col = mix(col, inkLight < 0.5 ? mix(col, uHaze, 0.22) : col * 0.8, frost * 0.9);
+        col = mix(col, inkLight < 0.5 ? mix(col, uHaze, 0.13) : col * 0.85, frost * 0.85);
 
         if (uRain > 0.0) {
           float falling = rainLayer(uv, 120.0, 1.2, 9.0, 0.22, 0.0) * 0.22 + rainLayer(uv, 70.0, 1.7, 7.0, 0.18, 7.0) * 0.3;
@@ -169,9 +169,9 @@ export function createBackdrop({ sky, clouds, letter }: BackdropInputs) {
         vec2 l = (uv - uLetterRect.xy) / uLetterRect.zw + 0.5;
         float onLetter = step(0.0, l.x) * step(l.x, 1.0) * step(0.0, l.y) * step(l.y, 1.0);
         float ink = texture2D(uLetter, clamp(l, 0.0, 1.0)).a * onLetter;
-        col = mix(col, uInk, ink * 0.88);
+        col = mix(col, uInk, clamp(ink * 1.1, 0.0, 0.94));
 
-        gl_FragColor = vec4(col, 1.0);
+        gl_FragColor = vec4(col, 0.0);
       }`,
   });
 

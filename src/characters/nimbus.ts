@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Character } from './types';
-import { felt } from './materials';
+import { addFuzz, felt, type SoftOptions } from './materials';
 import { blob, faceAlong, puffUnion, smile, surfaceAt } from './parts';
 import { clamp, damp, rng } from '../util/math';
 
@@ -33,12 +33,13 @@ export function createNimbus(): Character {
   const body = new THREE.Mesh(geometry);
   floater.add(body);
 
-  const eyeL = surfaceAt(body, -0.13, 0.03);
-  const eyeR = surfaceAt(body, 0.13, 0.03);
-  const cheekL = surfaceAt(body, -0.245, -0.055);
-  const cheekR = surfaceAt(body, 0.245, -0.055);
-  const mouthAt = surfaceAt(body, 0, -0.05);
-  body.material = felt('#f8f6f1', {
+  const eyeL = surfaceAt(body, -0.135, 0.02);
+  const eyeR = surfaceAt(body, 0.135, 0.02);
+  const cheekL = surfaceAt(body, -0.245, -0.06);
+  const cheekR = surfaceAt(body, 0.245, -0.06);
+  const mouthAt = surfaceAt(body, 0, -0.055);
+  const plush: SoftOptions = {
+    color: '#f8f6f1',
     sheenColor: '#ffffff',
     scatter: '#ffcdbd',
     rimColor: '#ffffff',
@@ -46,20 +47,32 @@ export function createNimbus(): Character {
     wrap: 0.7,
     detailStrength: 0.5,
     spots: [
-      { at: cheekL.point, radius: 0.075, color: '#ffa9a4', amount: 0.6, soft: 0.85 },
-      { at: cheekR.point, radius: 0.075, color: '#ffa9a4', amount: 0.6, soft: 0.85 },
+      { at: cheekL.point, radius: 0.085, color: '#ff9b96', amount: 0.7, soft: 0.85 },
+      { at: cheekR.point, radius: 0.085, color: '#ff9b96', amount: 0.7, soft: 0.85 },
+    ],
+    occluders: [{ at: new THREE.Vector3(0, -0.6, 0.05), radius: 0.45, strength: 0.4 }],
+  };
+  body.material = felt(plush.color, plush);
+  addFuzz(body, plush, {
+    length: 0.02,
+    density: 85,
+    shells: 6,
+    clear: [
+      { at: eyeL.point, radius: 0.085 },
+      { at: eyeR.point, radius: 0.085 },
+      { at: mouthAt.point, radius: 0.05 },
     ],
   });
 
   const lids: THREE.Mesh[] = [];
   for (const at of [eyeL, eyeR]) {
-    const lid = smile(0.085, 0.024, 0.0095);
-    lid.position.copy(at.point).addScaledVector(at.normal, 0.003);
-    faceAlong(lid, at.normal, 0.3);
+    const lid = smile(0.11, 0.032, 0.017);
+    lid.position.copy(at.point).addScaledVector(at.normal, 0.012);
+    faceAlong(lid, at.normal, 0.6);
     body.add(lid);
     lids.push(lid);
   }
-  const mouth = smile(0.036, 0.011, 0.007);
+  const mouth = smile(0.042, 0.013, 0.009);
   mouth.position.copy(mouthAt.point).addScaledVector(mouthAt.normal, 0.002);
   faceAlong(mouth, mouthAt.normal, 0.3);
   body.add(mouth);

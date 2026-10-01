@@ -14,11 +14,29 @@ import { Letter } from './letter/letter';
 import { Keychain, type CharmSetup } from './keychain/keychain';
 import { buildStone, createGlassShared } from './keychain/stone';
 import { buildKey, buildTag } from './keychain/charms';
+import { tagLayer } from './keychain/layers';
 import { createCast } from './characters';
 import { softLight } from './characters/materials';
 import { LoadingScreen } from './ui/loading';
 import { WeatherLine } from './ui/weatherLine';
 import { clamp, reduceMotion } from './util/math';
+
+if (import.meta.env.DEV) {
+  const errors: string[] = [];
+  (window as unknown as { __errors: string[] }).__errors = errors;
+  const original = console.error.bind(console);
+  console.error = (...args: unknown[]) => {
+    errors.push(args.map(String).join(' ').slice(0, 2000));
+    original(...args);
+  };
+  const originalWarn = console.warn.bind(console);
+  console.warn = (...args: unknown[]) => {
+    errors.push('[warn] ' + args.map(String).join(' ').slice(0, 500));
+    originalWarn(...args);
+  };
+  addEventListener('error', (e) => errors.push(`[error] ${e.message}`));
+  addEventListener('unhandledrejection', (e) => errors.push(`[rejection] ${String(e.reason)}`));
+}
 
 document.title = SITE_TITLE;
 const query = new URLSearchParams(location.search);
@@ -52,7 +70,10 @@ scene.add(key, fill, rim);
 const glassShared = createGlassShared();
 const cast = createCast();
 const setups: CharmSetup[] = cast.map((m) => {
-  const stone = buildStone({ id: m.id, scale: m.scale, tint: m.tint, bezel: m.bezel, character: m.character, seat: m.seat, seatScale: m.seatScale }, glassShared);
+  const stone = buildStone(
+    { id: m.id, scale: m.scale, tint: m.tint, ground: m.ground, groundAmount: m.groundAmount, bezel: m.bezel, character: m.character, seat: m.seat, seatScale: m.seatScale },
+    glassShared,
+  );
   return {
     id: m.id,
     body: stone.body,
@@ -64,12 +85,17 @@ const setups: CharmSetup[] = cast.map((m) => {
     depth: m.depth,
     glass: stone.glass,
     character: stone.character,
+    layer: stone.layer,
   };
 });
-const brassKey = buildKey(0.6);
-setups.push({ id: 'key', body: brassKey.body, picks: [brassKey.pick], hang: brassKey.hang, radius: brassKey.radius, size: brassKey.size, drop: 0.1, depth: -0.44, staysBack: true });
-const tag = buildTag(0.56);
-setups.push({ id: 'tag', body: tag.body, picks: [tag.pick], hang: tag.hang, radius: tag.radius, size: tag.size, drop: 0.27, depth: 0.24 });
+const brassKey = buildKey(0.62);
+const keyLayer = { value: 0.1 };
+tagLayer(brassKey.body, keyLayer);
+setups.push({ id: 'key', body: brassKey.body, picks: [brassKey.pick], hang: brassKey.hang, radius: brassKey.radius, size: brassKey.size, drop: 0.1, depth: -0.44, staysBack: true, layer: keyLayer });
+const tag = buildTag(0.58);
+const tagLayerU = { value: 0.4 };
+tagLayer(tag.body, tagLayerU);
+setups.push({ id: 'tag', body: tag.body, picks: [tag.pick], hang: tag.hang, radius: tag.radius, size: tag.size, drop: 0.27, depth: 0.24, layer: tagLayerU });
 const keychain = new Keychain(setups, camera);
 scene.add(keychain.group);
 if (!reduceMotion) keychain.hideAbove();
@@ -291,7 +317,7 @@ function showSky(f: SkyFrame, now: number, dt: number) {
   key.intensity = f.keyI;
   fill.color.copy(f.fill);
   fill.groundColor.copy(f.haze).multiplyScalar(0.75);
-  fill.intensity = f.fillI;
+  fill.intensity = f.fillI * 1.25 + 0.15;
   rim.color.copy(f.rim);
   rim.intensity = f.rimI;
   softLight.uRimLight.value.copy(f.fill).multiplyScalar(0.55 + 0.45 * f.fillI).lerp(f.key, 0.25);
@@ -366,7 +392,8 @@ canvas.addEventListener('pointerleave', () => {
 });
 
 // ---------------------------------------------------------------- entering
-const clock = new THREE.Clock();
+const startedAt = performance.now();
+const elapsed = () => (performance.now() - startedAt) / 1000;
 let entered = false;
 {
   const weatherReady = new Promise<void>((done) => {
@@ -381,7 +408,7 @@ let entered = false;
   Promise.all([Promise.race([Promise.allSettled(waits), timeout]), loading.typingDone]).then(async () => {
     loading.progress(1);
     await new Promise((r) => setTimeout(r, 200));
-    const now = clock.getElapsedTime();
+    const now = elapsed();
     keychain.startDrop(now + 0.35, reduceMotion);
     letter.start(now + (reduceMotion ? 0 : 1.2), reduceMotion);
     setTimeout(() => weatherLine.show(), reduceMotion ? 0 : 1500);
@@ -392,12 +419,8 @@ let entered = false;
 
 // ---------------------------------------------------------------- the loop
 let last = performance.now();
-function tick() {
-  const nowMs = performance.now();
-  const frameMs = nowMs - last;
-  last = nowMs;
-  const dt = Math.min(clock.getDelta(), 0.05);
-  const now = clock.elapsedTime;
+let simOffset = 0;
+function advance(dt: number, now: number, draw: boolean) {
   const k = reduceMotion ? 1 : 1 - Math.exp(-2.4 * dt);
   easeSky(skyShown, skyTarget, k);
   showSky(skyShown, now, dt);
@@ -405,11 +428,36 @@ function tick() {
   keychain.wind = 0.6 + Math.min(1.4, conditionsNow().wind / 18);
   keychain.update(dt, now);
   letter.update(gl, now, dt);
+  if (!draw) return;
   clouds.render(gl);
   renderer.render(now);
-  if (entered) renderer.adapt(frameMs, now);
+}
+function tick() {
+  const nowMs = performance.now();
+  const frameMs = nowMs - last;
+  last = nowMs;
+  advance(Math.min(frameMs / 1000, 0.05), elapsed() + simOffset, true);
+  if (entered) renderer.adapt(frameMs, elapsed());
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
 
-(window as unknown as { __keychain: unknown }).__keychain = { keychain, scene, camera, renderer, applySky, skyShown };
+if (import.meta.env.DEV) {
+  (window as unknown as { __keychain: unknown }).__keychain = {
+    keychain,
+    scene,
+    camera,
+    renderer,
+    applySky,
+    skyShown,
+    /** runs the scene forward synchronously (for screenshots when the tab is throttled) */
+    run(seconds: number) {
+      const steps = Math.ceil(seconds * 60);
+      for (let i = 0; i < steps; i++) {
+        simOffset += 1 / 60;
+        advance(1 / 60, elapsed() + simOffset, i === steps - 1);
+      }
+      return steps;
+    },
+  };
+}

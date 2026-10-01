@@ -131,8 +131,12 @@ export class Letter {
     let typed = 0;
     for (const line of this.lines) {
       [...line.text].forEach((ch, i) => {
-        x.globalAlpha = 0.66 + random() * 0.34;
-        x.fillText(ch, line.x + i * advance + (random() - 0.5) * 1.3, line.baseline + (random() - 0.5) * 1.8);
+        x.globalAlpha = 0.74 + random() * 0.26;
+        const cx = line.x + i * advance + (random() - 0.5) * 1.3;
+        const cy = line.baseline + (random() - 0.5) * 1.8;
+        x.fillText(ch, cx, cy);
+        x.globalAlpha *= 0.55;
+        x.fillText(ch, cx + 0.8, cy + 0.3);
       });
       for (const m of line.text.matchAll(/\S+/g)) {
         this.words.push({

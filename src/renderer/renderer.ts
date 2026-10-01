@@ -41,7 +41,7 @@ export class SceneRenderer {
     const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: this.samplesFor(this.dpr) });
     this.composer = new EffectComposer(this.gl, target);
     this.composer.addPass(new RenderPass(scene, camera));
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.28, 0.45, 0.95);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.24, 0.45, 1.05);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
     this.finish = new ShaderPass(finishShader);
